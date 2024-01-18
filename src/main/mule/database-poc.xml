@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="retrieve-employees-from-db-flow" doc:id="66c6a168-91d7-45e0-9860-60d5678c1b87" >
+		<http:listener doc:name="Listener" doc:id="34faa3eb-a6cf-471b-b229-7029c3b0e193" config-ref="HTTP_Listener_config_8084" path="/oracle"/>
+		<db:select doc:name="Retrieve Employees Data" doc:id="4549658a-0c3a-4cb1-b780-7400768af7ee" config-ref="Database_Config_Oracle">
+			<db:sql ><![CDATA[Select * from employees]]></db:sql>
+		</db:select>
+		<ee:transform doc:name="Response Payload" doc:id="9ec708df-79e0-4a12-b3c0-9d4d0b9439d8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log Payload" doc:id="051cd83a-63a7-4318-9526-a16746d4bbf3" message="#[payload]"/>
+	</flow>
+	<flow name="insert-employees-flow" doc:id="8d9c4da0-6586-4a8f-8f89-1db3e6630df9" >
+		<http:listener doc:name="Listener" doc:id="dcca7481-1e8e-40f1-86d0-12f9303650a2" config-ref="HTTP_Listener_config_8084" path="/insert" allowedMethods="POST"/>
+		<logger level="INFO" doc:name="Input Payload" doc:id="2cb02010-1a49-4046-8d4b-c39d7923e906" message="#[payload]"/>
+		<foreach doc:name="For Each" doc:id="a3c615ab-1bd5-43c1-820e-19a2376c7970" collection="#[payload]">
+			<ee:transform doc:name="Transform Message" doc:id="48c4d698-6e82-4f6d-9517-7245c94dc158">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+   	"EMPNAME": payload.EMPNAME,
+    "EMPID": payload.EMPID,
+    "EMPSALARY": payload.EMPSALARY,
+    "EMPLOCATION": payload.EMPLOCATION,
+    "EMPADDRESS": payload.EMPADDRESS,
+    "EMPACTIVE": payload.EMPACTIVE
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<db:insert doc:name="Insert Employee" doc:id="321103cd-5f2e-4cbc-8db0-a87ef8643d8a" config-ref="Database_Config_Oracle">
+			<db:sql><![CDATA[INSERT INTO employees 
+VALUES(:empname, :empid, :empaddress, :empsalary, :emplocation, :empactive)]]></db:sql>
+			<db:input-parameters><![CDATA[#[{
+	empname: payload.EMPNAME,
+	empid: payload.EMPID,
+	empsalary: payload.EMPSALARY,
+	emplocation: payload.EMPLOCATION,
+	empaddress: payload.EMPADDRESS,
+	empactive: payload.EMPACTIVE
+}]]]></db:input-parameters>
+		</db:insert>
+			<ee:transform doc:name="Transform Message" doc:id="6eaee3ae-84bd-4496-9d5a-c1ec7c589c20">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		</foreach>
+		<set-payload value='#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	"status" : "success"&#10;}]' doc:name="Response Payload" doc:id="6d9248ca-6948-4621-bb92-58277e021bfa" />
+		<logger level="INFO" doc:name="End Logger" doc:id="99fa50ec-cd6c-4c9c-810d-9ce68e8b9ebb" message='#[flow.name ++ " ended."]'/>
+	</flow>
+</mule>
